@@ -1,0 +1,390 @@
+//@version=6
+indicator("Custom Framework Builder v2.1", overlay=true)
+
+// Változók deklarációja a script elején
+var float fib1_plot1_value = na
+var float fib1_plot2_value = na
+var string fib1_plot1_candle = na
+var string fib1_plot2_candle = na
+var int fib1_curr_open_time = na
+var int fib1_next_open_time = na
+
+var float fib2_plot1_value = na
+var float fib2_plot2_value = na
+var string fib2_plot1_candle = na
+var string fib2_plot2_candle = na
+var int fib2_curr_open_time = na
+var int fib2_next_open_time = na
+
+var float fib3_plot1_value = na
+var float fib3_plot2_value = na
+var string fib3_plot1_candle = na
+var string fib3_plot2_candle = na
+var int fib3_curr_open_time = na
+var int fib3_next_open_time = na
+
+// Timeframe változók
+var string timeframe1 = na
+var string timeframe2 = na
+var string timeframe3 = na
+
+// Vonalak végének számítása
+current_bar_time = time
+bar_length_ms = timeframe.multiplier * 60 * 1000  // Egy gyertya hossza milliszekundumban
+extension_time = 1 * bar_length_ms  // 1 gyertyányi idő milliszekundumban
+
+// Segéd függvények
+f_get_value(o, h, l, c, selection) =>
+    selection == "O" ? o : selection == "H" ? h : selection == "L" ? l : c
+
+f_get_ohlc(timeframe, candle_selection) =>
+    var float o = na
+    var float h = na
+    var float l = na
+    var float c = na
+    var int curr_open_time = na
+    var int next_open_time = na
+    
+    current_bar = request.security(syminfo.tickerid, timeframe, bar_index)
+    previous_bar = request.security(syminfo.tickerid, timeframe, bar_index[1])
+    
+    is_new_bar = current_bar != previous_bar
+    
+    if candle_selection == "Current" or (not is_new_bar and candle_selection == "Previous")
+        [curr_o, curr_h, curr_l, curr_c, curr_time] = request.security(syminfo.tickerid, timeframe, [open, high, low, close, time])
+        o := curr_o
+        h := curr_h
+        l := curr_l
+        c := curr_c
+        curr_open_time := curr_time
+        next_open_time := curr_time + (timeframe.multiplier * 60 * 1000)
+    else
+        [prev_o, prev_h, prev_l, prev_c, prev_time, curr_time] = request.security(syminfo.tickerid, timeframe, [open[1], high[1], low[1], close[1], time[1], time])
+        o := prev_o
+        h := prev_h
+        l := prev_l
+        c := prev_c
+        curr_open_time := prev_time
+        next_open_time := curr_time
+    
+    [o, h, l, c, curr_open_time, next_open_time]
+f_create_plot(enable, ohlc_value, curr_open_time, next_open_time, style, plot_color, width, label_text, is_previous, extend) =>
+    if enable
+        line_style = style == "Solid" ? line.style_solid : style == "Dashed" ? line.style_dashed : line.style_dotted
+        var line l = na
+        var label lab = na
+        
+        // Ha extend be van kapcsolva, akkor mindig timenow-ig megy
+        // Ha nincs, akkor a korábbi logika szerint
+        end_time = extend ? timenow : (is_previous ? next_open_time : timenow)
+        
+        if na(l)
+            l := line.new(x1=curr_open_time, y1=ohlc_value, x2=end_time, y2=ohlc_value, 
+                 xloc=xloc.bar_time, color=plot_color, width=width, style=line_style)
+            lab := label.new(x=end_time, y=ohlc_value, text=label_text, 
+                 xloc=xloc.bar_time, color=color.white, style=label.style_none, textcolor=plot_color,
+                 yloc=yloc.price)
+        else
+            line.set_xy1(l, curr_open_time, ohlc_value)
+            line.set_xy2(l, end_time, ohlc_value)
+            label.set_xy(lab, end_time, ohlc_value)
+            label.set_text(lab, label_text)
+            line.set_color(l, plot_color)
+            line.set_width(l, width)
+            line.set_style(l, line_style)
+            label.set_color(lab, plot_color)
+            label.set_textcolor(lab, plot_color)
+        lab
+    else
+        label.new(na, na, "")
+
+f_draw_fibonacci_levels(plot1_value, plot2_value, fib_color, fib_width, fib_line_style, plot1_candle, plot2_candle, curr_open_time, next_open_time, extend) =>
+    // Fibonacci szintek külön-külön inicializálva a kért értékekkel
+    fib_data = array.new_float(6)
+    array.set(fib_data, 0, 0.0)    // 0%   - Első plot szintje
+    array.set(fib_data, 1, 0.25)   // 25%
+    array.set(fib_data, 2, 0.5)    // 50%
+    array.set(fib_data, 3, 0.618)  // 61.8%
+    array.set(fib_data, 4, 0.75)   // 75%
+    array.set(fib_data, 5, 1.0)    // 100% - Második plot szintje
+
+    // Vonalstílus beállítása
+    line_style = fib_line_style == "Solid" ? line.style_solid : 
+                 fib_line_style == "Dashed" ? line.style_dashed : 
+                 line.style_dotted
+
+    // Vonalak és címkék tárolása változókban
+    var line[] fib_lines = array.new_line()
+    var label[] fib_labels = array.new_label()
+
+    // Ha extend be van kapcsolva, akkor mindig timenow-ig megy
+    // Ha nincs, akkor a korábbi logika szerint
+    end_time = extend ? timenow : ((plot1_candle == "Previous" and plot2_candle == "Previous") ? next_open_time : timenow)
+
+    // Első inicializálás
+    if array.size(fib_lines) == 0
+        for i = 0 to array.size(fib_data) - 1
+            array.push(fib_lines, line.new(x1=curr_open_time, y1=0, x2=end_time, y2=0, 
+                 color=fib_color, width=fib_width, style=line_style, xloc=xloc.bar_time))
+            array.push(fib_labels, label.new(x=end_time, y=0, text="", 
+                 xloc=xloc.bar_time, style=label.style_none, 
+                 textcolor=fib_color, size=size.small))
+
+    // Vonalak és címkék frissítése
+    for i = 0 to array.size(fib_data) - 1
+        level = array.get(fib_data, i)
+        fib_line_y = plot1_value + (plot2_value - plot1_value) * level
+        
+        fib_line = array.get(fib_lines, i)
+        fib_label = array.get(fib_labels, i)
+        
+        line.set_xy1(fib_line, curr_open_time, fib_line_y)
+        line.set_xy2(fib_line, end_time, fib_line_y)
+        line.set_color(fib_line, fib_color)
+        line.set_width(fib_line, fib_width)
+        line.set_style(fib_line, line_style)
+        
+        label_text = str.tostring(level * 100, "#.#") + "%"
+        label.set_xy(fib_label, end_time, fib_line_y)
+        label.set_text(fib_label, label_text)
+        label.set_textcolor(fib_label, fib_color)
+// Input mezők minden plothoz
+// Plot 1
+p1_enable = input.bool(true, "", group="Plot 1", inline="p1", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p1_candle = input.string("Previous", "", group="Plot 1", options=["Current", "Previous"], inline="p1")
+p1_tf = input.timeframe("D", "", group="Plot 1", inline="p1")
+p1_ohlc = input.string("H", "", group="Plot 1", options=["O", "H", "L", "C"], inline="p1")
+p1_style = input.string("Solid", "", group="Plot 1", options=["Solid", "Dashed", "Dotted"], inline="p1_style")
+p1_color = input.color(color.blue, "", group="Plot 1", inline="p1_style")
+p1_width = input.int(2, "", group="Plot 1", inline="p1_style", minval=1, maxval=4)
+p1_label = input.string("Previous day high", "Label", group="Plot 1", inline="p1_label")
+p1_extend = input.bool(true, "Extend Line", group="Plot 1", inline="p1_style")
+
+// Plot 2
+p2_enable = input.bool(true, "", group="Plot 2", inline="p2", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p2_candle = input.string("Previous", "", group="Plot 2", options=["Current", "Previous"], inline="p2")
+p2_tf = input.timeframe("D", "", group="Plot 2", inline="p2")
+p2_ohlc = input.string("L", "", group="Plot 2", options=["O", "H", "L", "C"], inline="p2")
+p2_style = input.string("Solid", "", group="Plot 2", options=["Solid", "Dashed", "Dotted"], inline="p2_style")
+p2_color = input.color(color.red, "", group="Plot 2", inline="p2_style")
+p2_width = input.int(2, "", group="Plot 2", inline="p2_style", minval=1, maxval=4)
+p2_label = input.string("Previous day low", "Label", group="Plot 2", inline="p2_label")
+p2_extend = input.bool(true, "Extend Line", group="Plot 2", inline="p2_style")
+
+// Plot 3
+p3_enable = input.bool(true, "", group="Plot 3", inline="p3", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p3_candle = input.string("Current", "", group="Plot 3", options=["Current", "Previous"], inline="p3")
+p3_tf = input.timeframe("D", "", group="Plot 3", inline="p3")
+p3_ohlc = input.string("H", "", group="Plot 3", options=["O", "H", "L", "C"], inline="p3")
+p3_style = input.string("Dashed", "", group="Plot 3", options=["Solid", "Dashed", "Dotted"], inline="p3_style")
+p3_color = input.color(color.blue, "", group="Plot 3", inline="p3_style")
+p3_width = input.int(1, "", group="Plot 3", inline="p3_style", minval=1, maxval=4)
+p3_label = input.string("Daily high", "Label", group="Plot 3", inline="p3_label")
+p3_extend = input.bool(false, "Extend Line", group="Plot 3", inline="p3_style")
+
+// Plot 4
+p4_enable = input.bool(true, "", group="Plot 4", inline="p4", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p4_candle = input.string("Current", "", group="Plot 4", options=["Current", "Previous"], inline="p4")
+p4_tf = input.timeframe("D", "", group="Plot 4", inline="p4")
+p4_ohlc = input.string("L", "", group="Plot 4", options=["O", "H", "L", "C"], inline="p4")
+p4_style = input.string("Dashed", "", group="Plot 4", options=["Solid", "Dashed", "Dotted"], inline="p4_style")
+p4_color = input.color(color.red, "", group="Plot 4", inline="p4_style")
+p4_width = input.int(1, "", group="Plot 4", inline="p4_style", minval=1, maxval=4)
+p4_label = input.string("Daily low", "Label", group="Plot 4", inline="p4_label")
+p4_extend = input.bool(false, "Extend Line", group="Plot 4", inline="p4_style")
+
+// Plot 5
+p5_enable = input.bool(true, "", group="Plot 5", inline="p5", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p5_candle = input.string("Current", "", group="Plot 5", options=["Current", "Previous"], inline="p5")
+p5_tf = input.timeframe("D", "", group="Plot 5", inline="p5")
+p5_ohlc = input.string("O", "", group="Plot 5", options=["O", "H", "L", "C"], inline="p5")
+p5_style = input.string("Dotted", "", group="Plot 5", options=["Solid", "Dashed", "Dotted"], inline="p5_style")
+p5_color = input.color(color.green, "", group="Plot 5", inline="p5_style")
+p5_width = input.int(1, "", group="Plot 5", inline="p5_style", minval=1, maxval=4)
+p5_label = input.string("Daily open", "Label", group="Plot 5", inline="p5_label")
+p5_extend = input.bool(false, "Extend Line", group="Plot 5", inline="p5_style")
+
+// Plot 6
+p6_enable = input.bool(false, "", group="Plot 6", inline="p6", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p6_candle = input.string("Previous", "", group="Plot 6", options=["Current", "Previous"], inline="p6")
+p6_tf = input.timeframe("60", "", group="Plot 6", inline="p6")
+p6_ohlc = input.string("H", "", group="Plot 6", options=["O", "H", "L", "C"], inline="p6")
+p6_style = input.string("Solid", "", group="Plot 6", options=["Solid", "Dashed", "Dotted"], inline="p6_style")
+p6_color = input.color(color.gray, "", group="Plot 6", inline="p6_style")
+p6_width = input.int(1, "", group="Plot 6", inline="p6_style", minval=1, maxval=4)
+p6_label = input.string("", "Label", group="Plot 6", inline="p6_label")
+p6_extend = input.bool(false, "Extend Line", group="Plot 6", inline="p6_style")
+
+// Plot 7
+p7_enable = input.bool(false, "", group="Plot 7", inline="p7", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p7_candle = input.string("Previous", "", group="Plot 7", options=["Current", "Previous"], inline="p7")
+p7_tf = input.timeframe("60", "", group="Plot 7", inline="p7")
+p7_ohlc = input.string("L", "", group="Plot 7", options=["O", "H", "L", "C"], inline="p7")
+p7_style = input.string("Solid", "", group="Plot 7", options=["Solid", "Dashed", "Dotted"], inline="p7_style")
+p7_color = input.color(color.gray, "", group="Plot 7", inline="p7_style")
+p7_width = input.int(1, "", group="Plot 7", inline="p7_style", minval=1, maxval=4)
+p7_label = input.string("", "Label", group="Plot 7", inline="p7_label")
+p7_extend = input.bool(false, "Extend Line", group="Plot 7", inline="p7_style")
+
+// Plot 8
+p8_enable = input.bool(false, "", group="Plot 8", inline="p8", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p8_candle = input.string("Current", "", group="Plot 8", options=["Current", "Previous"], inline="p8")
+p8_tf = input.timeframe("60", "", group="Plot 8", inline="p8")
+p8_ohlc = input.string("H", "", group="Plot 8", options=["O", "H", "L", "C"], inline="p8")
+p8_style = input.string("Dashed", "", group="Plot 8", options=["Solid", "Dashed", "Dotted"], inline="p8_style")
+p8_color = input.color(color.gray, "", group="Plot 8", inline="p8_style")
+p8_width = input.int(1, "", group="Plot 8", inline="p8_style", minval=1, maxval=4)
+p8_label = input.string("", "Label", group="Plot 8", inline="p8_label")
+p8_extend = input.bool(false, "Extend Line", group="Plot 8", inline="p8_style")
+
+// Plot 9
+p9_enable = input.bool(false, "", group="Plot 9", inline="p9", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p9_candle = input.string("Current", "", group="Plot 9", options=["Current", "Previous"], inline="p9")
+p9_tf = input.timeframe("60", "", group="Plot 9", inline="p9")
+p9_ohlc = input.string("L", "", group="Plot 9", options=["O", "H", "L", "C"], inline="p9")
+p9_style = input.string("Dashed", "", group="Plot 9", options=["Solid", "Dashed", "Dotted"], inline="p9_style")
+p9_color = input.color(color.gray, "", group="Plot 9", inline="p9_style")
+p9_width = input.int(1, "", group="Plot 9", inline="p9_style", minval=1, maxval=4)
+p9_label = input.string("", "Label", group="Plot 9", inline="p9_label")
+p9_extend = input.bool(false, "Extend Line", group="Plot 9", inline="p9_style")
+
+// Plot 10
+p10_enable = input.bool(false, "", group="Plot 10", inline="p10", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+p10_candle = input.string("Current", "", group="Plot 10", options=["Current", "Previous"], inline="p10")
+p10_tf = input.timeframe("60", "", group="Plot 10", inline="p10")
+p10_ohlc = input.string("O", "", group="Plot 10", options=["O", "H", "L", "C"], inline="p10")
+p10_style = input.string("Dotted", "", group="Plot 10", options=["Solid", "Dashed", "Dotted"], inline="p10_style")
+p10_color = input.color(color.gray, "", group="Plot 10", inline="p10_style")
+p10_width = input.int(1, "", group="Plot 10", inline="p10_style", minval=1, maxval=4)
+p10_label = input.string("", "Label", group="Plot 10", inline="p10_label")
+p10_extend = input.bool(false, "Extend Line", group="Plot 10", inline="p10_style")
+
+// Fibonacci 1 beállítások
+fib1_enable = input.bool(true, "Enable Fibonacci 1", group="Fibonacci 1", inline="fib1_main")
+fib1_plot1 = input.string("Plot 1", "First Plot", tooltip = "Fibonacci 1 start point", group="Fibonacci 1", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib1_plot2 = input.string("Plot 2", "Second Plot", tooltip = "Fibonacci 1 end point", group="Fibonacci 1", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib1_color = input.color(color.black, "Color", group="Fibonacci 1", inline="fib1_style")
+fib1_width = input.int(1, "Width", group="Fibonacci 1", inline="fib1_style", minval=1, maxval=4)
+fib1_line_style = input.string("Dashed", "Style", group="Fibonacci 1", options=["Solid", "Dashed", "Dotted"], inline="fib1_style")
+fib1_extend = input.bool(false, "Extend Lines", group="Fibonacci 1", inline="fib1_style")
+
+
+// Fibonacci 2 beállítások
+fib2_enable = input.bool(true, "Enable Fibonacci 2", group="Fibonacci 2", inline="fib2_main")
+fib2_plot1 = input.string("Plot 6", "First Plot", tooltip = "Fibonacci 2 starting point", group="Fibonacci 2", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib2_plot2 = input.string("Plot 7", "Second Plot", tooltip = "Fibonacci 2 end point", group="Fibonacci 2", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib2_color = input.color(color.gray, "Color", group="Fibonacci 2", inline="fib2_style")
+fib2_width = input.int(1, "Width", group="Fibonacci 2", inline="fib2_style", minval=1, maxval=4)
+fib2_line_style = input.string("Solid", "Style", group="Fibonacci 2", options=["Solid", "Dashed", "Dotted"], inline="fib2_style")
+fib2_extend = input.bool(false, "Extend Lines", group="Fibonacci 2", inline="fib2_style")
+
+// Fibonacci 3 beállítások
+fib3_enable = input.bool(true, "Enable Fibonacci 3", group="Fibonacci 3", inline="fib3_main")
+fib3_plot1 = input.string("Plot 8", "First Plot", tooltip = "Fibonacci 3 starting point", group="Fibonacci 3", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib3_plot2 = input.string("Plot 9", "Second Plot", tooltip = "Fibonacci 3 end point", group="Fibonacci 3", options=["Plot 1", "Plot 2", "Plot 3", "Plot 4", "Plot 5", "Plot 6", "Plot 7", "Plot 8", "Plot 9", "Plot 10"])
+fib3_color = input.color(color.gray, "Color", group="Fibonacci 3", inline="fib3_style")
+fib3_width = input.int(1, "Width", group="Fibonacci 3", inline="fib3_style", minval=1, maxval=4)
+fib3_line_style = input.string("Solid", "Style", group="Fibonacci 3", options=["Solid", "Dashed", "Dotted"], inline="fib3_style")
+fib3_extend = input.bool(false, "Extend Lines", group="Fibonacci 3", inline="fib3_style")
+
+// Plot létrehozása minden beállításhoz
+var float value1 = na
+var float value2 = na
+var float value3 = na
+var float value4 = na
+var float value5 = na
+var float value6 = na
+var float value7 = na
+var float value8 = na
+var float value9 = na
+var float value10 = na
+
+if p1_enable
+    [o1, h1, l1, c1, t1_curr, t1_next] = f_get_ohlc(p1_tf, p1_candle)
+    value1 := f_get_value(o1, h1, l1, c1, p1_ohlc)
+    f_create_plot(p1_enable, value1, t1_curr, t1_next, p1_style, p1_color, p1_width, p1_label, p1_candle == "Previous", p1_extend)
+
+if p2_enable
+    [o2, h2, l2, c2, t2_curr, t2_next] = f_get_ohlc(p2_tf, p2_candle)
+    value2 := f_get_value(o2, h2, l2, c2, p2_ohlc)
+    f_create_plot(p2_enable, value2, t2_curr, t2_next, p2_style, p2_color, p2_width, p2_label, p2_candle == "Previous", p2_extend)
+if p3_enable
+    [o3, h3, l3, c3, t3_curr, t3_next] = f_get_ohlc(p3_tf, p3_candle)
+    value3 := f_get_value(o3, h3, l3, c3, p3_ohlc)
+    f_create_plot(p3_enable, value3, t3_curr, t3_next, p3_style, p3_color, p3_width, p3_label, p3_candle == "Previous", p3_extend)
+
+if p4_enable
+    [o4, h4, l4, c4, t4_curr, t4_next] = f_get_ohlc(p4_tf, p4_candle)
+    value4 := f_get_value(o4, h4, l4, c4, p4_ohlc)
+    f_create_plot(p4_enable, value4, t4_curr, t4_next, p4_style, p4_color, p4_width, p4_label, p4_candle == "Previous", p4_extend)
+
+if p5_enable
+    [o5, h5, l5, c5, t5_curr, t5_next] = f_get_ohlc(p5_tf, p5_candle)
+    value5 := f_get_value(o5, h5, l5, c5, p5_ohlc)
+    f_create_plot(p5_enable, value5, t5_curr, t5_next, p5_style, p5_color, p5_width, p5_label, p5_candle == "Previous", p5_extend)
+
+if p6_enable
+    [o6, h6, l6, c6, t6_curr, t6_next] = f_get_ohlc(p6_tf, p6_candle)
+    value6 := f_get_value(o6, h6, l6, c6, p6_ohlc)
+    f_create_plot(p6_enable, value6, t6_curr, t6_next, p6_style, p6_color, p6_width, p6_label, p6_candle == "Previous", p6_extend)
+
+if p7_enable
+    [o7, h7, l7, c7, t7_curr, t7_next] = f_get_ohlc(p7_tf, p7_candle)
+    value7 := f_get_value(o7, h7, l7, c7, p7_ohlc)
+    f_create_plot(p7_enable, value7, t7_curr, t7_next, p7_style, p7_color, p7_width, p7_label, p7_candle == "Previous", p7_extend)
+
+if p8_enable
+    [o8, h8, l8, c8, t8_curr, t8_next] = f_get_ohlc(p8_tf, p8_candle)
+    value8 := f_get_value(o8, h8, l8, c8, p8_ohlc)
+    f_create_plot(p8_enable, value8, t8_curr, t8_next, p8_style, p8_color, p8_width, p8_label, p8_candle == "Previous", p8_extend)
+
+if p9_enable
+    [o9, h9, l9, c9, t9_curr, t9_next] = f_get_ohlc(p9_tf, p9_candle)
+    value9 := f_get_value(o9, h9, l9, c9, p9_ohlc)
+    f_create_plot(p9_enable, value9, t9_curr, t9_next, p9_style, p9_color, p9_width, p9_label, p9_candle == "Previous", p9_extend)
+
+if p10_enable
+    [o10, h10, l10, c10, t10_curr, t10_next] = f_get_ohlc(p10_tf, p10_candle)
+    value10 := f_get_value(o10, h10, l10, c10, p10_ohlc)
+    f_create_plot(p10_enable, value10, t10_curr, t10_next, p10_style, p10_color, p10_width, p10_label, p10_candle == "Previous", p10_extend)
+
+// Fibonacci 1
+[o_temp1, h_temp1, l_temp1, c_temp1, curr_time1, next_time1] = f_get_ohlc(timeframe1, fib1_plot1_candle)
+
+if fib1_enable and fib1_plot1 != fib1_plot2
+    fib1_plot1_candle := fib1_plot1 == "Plot 1" ? p1_candle : fib1_plot1 == "Plot 2" ? p2_candle : fib1_plot1 == "Plot 3" ? p3_candle : fib1_plot1 == "Plot 4" ? p4_candle : fib1_plot1 == "Plot 5" ? p5_candle : fib1_plot1 == "Plot 6" ? p6_candle : fib1_plot1 == "Plot 7" ? p7_candle : fib1_plot1 == "Plot 8" ? p8_candle : fib1_plot1 == "Plot 9" ? p9_candle : fib1_plot1 == "Plot 10" ? p10_candle : na
+    fib1_plot1_value := fib1_plot1 == "Plot 1" ? value1 : fib1_plot1 == "Plot 2" ? value2 : fib1_plot1 == "Plot 3" ? value3 : fib1_plot1 == "Plot 4" ? value4 : fib1_plot1 == "Plot 5" ? value5 : fib1_plot1 == "Plot 6" ? value6 : fib1_plot1 == "Plot 7" ? value7 : fib1_plot1 == "Plot 8" ? value8 : fib1_plot1 == "Plot 9" ? value9 : fib1_plot1 == "Plot 10" ? value10 : na
+    fib1_plot2_candle := fib1_plot2 == "Plot 1" ? p1_candle : fib1_plot2 == "Plot 2" ? p2_candle : fib1_plot2 == "Plot 3" ? p3_candle : fib1_plot2 == "Plot 4" ? p4_candle : fib1_plot2 == "Plot 5" ? p5_candle : fib1_plot2 == "Plot 6" ? p6_candle : fib1_plot2 == "Plot 7" ? p7_candle : fib1_plot2 == "Plot 8" ? p8_candle : fib1_plot2 == "Plot 9" ? p9_candle : fib1_plot2 == "Plot 10" ? p10_candle : na
+    fib1_plot2_value := fib1_plot2 == "Plot 1" ? value1 : fib1_plot2 == "Plot 2" ? value2 : fib1_plot2 == "Plot 3" ? value3 : fib1_plot2 == "Plot 4" ? value4 : fib1_plot2 == "Plot 5" ? value5 : fib1_plot2 == "Plot 6" ? value6 : fib1_plot2 == "Plot 7" ? value7 : fib1_plot2 == "Plot 8" ? value8 : fib1_plot2 == "Plot 9" ? value9 : fib1_plot2 == "Plot 10" ? value10 : na
+    
+    if not na(fib1_plot1_value) and not na(fib1_plot2_value)
+        timeframe1 := fib1_plot1 == "Plot 1" ? p1_tf : fib1_plot1 == "Plot 2" ? p2_tf : fib1_plot1 == "Plot 3" ? p3_tf : fib1_plot1 == "Plot 4" ? p4_tf : fib1_plot1 == "Plot 5" ? p5_tf : fib1_plot1 == "Plot 6" ? p6_tf : fib1_plot1 == "Plot 7" ? p7_tf : fib1_plot1 == "Plot 8" ? p8_tf : fib1_plot1 == "Plot 9" ? p9_tf : fib1_plot1 == "Plot 10" ? p10_tf : na
+        fib1_curr_open_time := curr_time1
+        fib1_next_open_time := next_time1
+        f_draw_fibonacci_levels(fib1_plot1_value, fib1_plot2_value, fib1_color, fib1_width, fib1_line_style, fib1_plot1_candle, fib1_plot2_candle, fib1_curr_open_time, fib1_next_open_time, fib1_extend)
+
+// Fibonacci 2
+if fib2_enable and fib2_plot1 != fib2_plot2
+    fib2_plot1_candle := fib2_plot1 == "Plot 1" ? p1_candle : fib2_plot1 == "Plot 2" ? p2_candle : fib2_plot1 == "Plot 3" ? p3_candle : fib2_plot1 == "Plot 4" ? p4_candle : fib2_plot1 == "Plot 5" ? p5_candle : fib2_plot1 == "Plot 6" ? p6_candle : fib2_plot1 == "Plot 7" ? p7_candle : fib2_plot1 == "Plot 8" ? p8_candle : fib2_plot1 == "Plot 9" ? p9_candle : fib2_plot1 == "Plot 10" ? p10_candle : na
+    fib2_plot1_value := fib2_plot1 == "Plot 1" ? value1 : fib2_plot1 == "Plot 2" ? value2 : fib2_plot1 == "Plot 3" ? value3 : fib2_plot1 == "Plot 4" ? value4 : fib2_plot1 == "Plot 5" ? value5 : fib2_plot1 == "Plot 6" ? value6 : fib2_plot1 == "Plot 7" ? value7 : fib2_plot1 == "Plot 8" ? value8 : fib2_plot1 == "Plot 9" ? value9 : fib2_plot1 == "Plot 10" ? value10 : na
+    fib2_plot2_candle := fib2_plot2 == "Plot 1" ? p1_candle : fib2_plot2 == "Plot 2" ? p2_candle : fib2_plot2 == "Plot 3" ? p3_candle : fib2_plot2 == "Plot 4" ? p4_candle : fib2_plot2 == "Plot 5" ? p5_candle : fib2_plot2 == "Plot 6" ? p6_candle : fib2_plot2 == "Plot 7" ? p7_candle : fib2_plot2 == "Plot 8" ? p8_candle : fib2_plot2 == "Plot 9" ? p9_candle : fib2_plot2 == "Plot 10" ? p10_candle : na
+    fib2_plot2_value := fib2_plot2 == "Plot 1" ? value1 : fib2_plot2 == "Plot 2" ? value2 : fib2_plot2 == "Plot 3" ? value3 : fib2_plot2 == "Plot 4" ? value4 : fib2_plot2 == "Plot 5" ? value5 : fib2_plot2 == "Plot 6" ? value6 : fib2_plot2 == "Plot 7" ? value7 : fib2_plot2 == "Plot 8" ? value8 : fib2_plot2 == "Plot 9" ? value9 : fib2_plot2 == "Plot 10" ? value10 : na
+    
+    if not na(fib2_plot1_value) and not na(fib2_plot2_value)
+        timeframe1 := fib2_plot1 == "Plot 1" ? p1_tf : fib2_plot1 == "Plot 2" ? p2_tf : fib2_plot1 == "Plot 3" ? p3_tf : fib2_plot1 == "Plot 4" ? p4_tf : fib2_plot1 == "Plot 5" ? p5_tf : fib2_plot1 == "Plot 6" ? p6_tf : fib2_plot1 == "Plot 7" ? p7_tf : fib2_plot1 == "Plot 8" ? p8_tf : fib2_plot1 == "Plot 9" ? p9_tf : fib2_plot1 == "Plot 10" ? p10_tf : na
+        fib2_curr_open_time := curr_time1
+        fib2_next_open_time := next_time1
+        f_draw_fibonacci_levels(fib2_plot1_value, fib2_plot2_value, fib2_color, fib2_width, fib2_line_style, fib2_plot1_candle, fib2_plot2_candle, fib2_curr_open_time, fib2_next_open_time, fib2_extend)
+
+// Fibonacci 3
+if fib3_enable and fib3_plot1 != fib3_plot2
+    fib3_plot1_candle := fib3_plot1 == "Plot 1" ? p1_candle : fib3_plot1 == "Plot 2" ? p2_candle : fib3_plot1 == "Plot 3" ? p3_candle : fib3_plot1 == "Plot 4" ? p4_candle : fib3_plot1 == "Plot 5" ? p5_candle : fib3_plot1 == "Plot 6" ? p6_candle : fib3_plot1 == "Plot 7" ? p7_candle : fib3_plot1 == "Plot 8" ? p8_candle : fib3_plot1 == "Plot 9" ? p9_candle : fib3_plot1 == "Plot 10" ? p10_candle : na
+    fib3_plot1_value := fib3_plot1 == "Plot 1" ? value1 : fib3_plot1 == "Plot 2" ? value2 : fib3_plot1 == "Plot 3" ? value3 : fib3_plot1 == "Plot 4" ? value4 : fib3_plot1 == "Plot 5" ? value5 : fib3_plot1 == "Plot 6" ? value6 : fib3_plot1 == "Plot 7" ? value7 : fib3_plot1 == "Plot 8" ? value8 : fib3_plot1 == "Plot 9" ? value9 : fib3_plot1 == "Plot 10" ? value10 : na
+    fib3_plot2_candle := fib3_plot2 == "Plot 1" ? p1_candle : fib3_plot2 == "Plot 2" ? p2_candle : fib3_plot2 == "Plot 3" ? p3_candle : fib3_plot2 == "Plot 4" ? p4_candle : fib3_plot2 == "Plot 5" ? p5_candle : fib3_plot2 == "Plot 6" ? p6_candle : fib3_plot2 == "Plot 7" ? p7_candle : fib3_plot2 == "Plot 8" ? p8_candle : fib3_plot2 == "Plot 9" ? p9_candle : fib3_plot2 == "Plot 10" ? p10_candle : na
+    fib3_plot2_value := fib3_plot2 == "Plot 1" ? value1 : fib3_plot2 == "Plot 2" ? value2 : fib3_plot2 == "Plot 3" ? value3 : fib3_plot2 == "Plot 4" ? value4 : fib3_plot2 == "Plot 5" ? value5 : fib3_plot2 == "Plot 6" ? value6 : fib3_plot2 == "Plot 7" ? value7 : fib3_plot2 == "Plot 8" ? value8 : fib3_plot2 == "Plot 9" ? value9 : fib3_plot2 == "Plot 10" ? value10 : na
+    
+    if not na(fib3_plot1_value) and not na(fib3_plot2_value)
+        timeframe1 := fib3_plot1 == "Plot 1" ? p1_tf : fib3_plot1 == "Plot 2" ? p2_tf : fib3_plot1 == "Plot 3" ? p3_tf : fib3_plot1 == "Plot 4" ? p4_tf : fib3_plot1 == "Plot 5" ? p5_tf : fib3_plot1 == "Plot 6" ? p6_tf : fib3_plot1 == "Plot 7" ? p7_tf : fib3_plot1 == "Plot 8" ? p8_tf : fib3_plot1 == "Plot 9" ? p9_tf : fib3_plot1 == "Plot 10" ? p10_tf : na
+        fib3_curr_open_time := curr_time1
+        fib3_next_open_time := next_time1
+        f_draw_fibonacci_levels(fib3_plot1_value, fib3_plot2_value, fib3_color, fib3_width, fib3_line_style, fib3_plot1_candle, fib3_plot2_candle, fib3_curr_open_time, fib3_next_open_time, fib3_extend)
