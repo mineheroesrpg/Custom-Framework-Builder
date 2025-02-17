@@ -1,120 +1,831 @@
 //@version=6
-// Aktualizálva: 2025-02-17 16:42
+// Aktualizálva: 2025-02-17 19:02
 // szerző: mineheroesrpg
 
 indicator("Custom Framework Builder v2.3", overlay=true)
 
+// =================== Preset System ===================
+string DEFAULT_PRESET = "Custom"
+string selected_preset = input.string(DEFAULT_PRESET, "Preset", 
+     options=["Custom", "Weekly Orderflow", "Daily Orderflow"], 
+     group="Preset Settings", 
+     tooltip="Select a preset configuration or use Custom for manual settings")
+
 // =================== Input mezők ===================
-
+// Runtime változók deklarálása
 // Plot 1
-p1_enable = input.bool(true, "", group="Plot 1", inline="p1", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p1_candle = input.string("Previous", "", group="Plot 1", options=["Current", "Previous"], inline="p1")
-p1_tf = input.timeframe("W", "", group="Plot 1", inline="p1")
-p1_ohlc = input.string("H", "", group="Plot 1", options=["O", "H", "L", "C"], inline="p1")
-p1_style = input.string("Solid", "", group="Plot 1", options=["Solid", "Dashed", "Dotted"], inline="p1_style")
-p1_color = input.color(color.blue, "", group="Plot 1", inline="p1_style")
-p1_width = input.int(2, "", group="Plot 1", inline="p1_style", minval=1, maxval=4)
-p1_label = input.string("Prev. Week high", "Label", group="Plot 1", inline="p1_label")
-p1_extend = input.bool(false, "Extend Line", group="Plot 1", inline="p1_style")
-
+var bool p1_enable = true
+var string p1_candle = "Previous"
+var string p1_tf = "W"
+var string p1_ohlc = "H"
+var string p1_style = "Solid"
+var color p1_color = color.blue
+var int p1_width = 2
+var string p1_label = "Prev. Week high"
+var bool p1_extend = false
 // Plot 2
-p2_enable = input.bool(true, "", group="Plot 2", inline="p2", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p2_candle = input.string("Previous", "", group="Plot 2", options=["Current", "Previous"], inline="p2")
-p2_tf = input.timeframe("W", "", group="Plot 2", inline="p2")
-p2_ohlc = input.string("L", "", group="Plot 2", options=["O", "H", "L", "C"], inline="p2")
-p2_style = input.string("Solid", "", group="Plot 2", options=["Solid", "Dashed", "Dotted"], inline="p2_style")
-p2_color = input.color(color.red, "", group="Plot 2", inline="p2_style")
-p2_width = input.int(2, "", group="Plot 2", inline="p2_style", minval=1, maxval=4)
-p2_label = input.string("Prev. Week low", "Label", group="Plot 2", inline="p2_label")
-p2_extend = input.bool(false, "Extend Line", group="Plot 2", inline="p2_style")
-
+var bool p2_enable = true
+var string p2_candle = "Previous"
+var string p2_tf = "W"
+var string p2_ohlc = "L"
+var string p2_style = "Solid"
+var color p2_color = color.red
+var int p2_width = 2
+var string p2_label = "Prev. Week low"
+var bool p2_extend = false
 // Plot 3
-p3_enable = input.bool(true, "", group="Plot 3", inline="p3", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p3_candle = input.string("Current", "", group="Plot 3", options=["Current", "Previous"], inline="p3")
-p3_tf = input.timeframe("W", "", group="Plot 3", inline="p3")
-p3_ohlc = input.string("H", "", group="Plot 3", options=["O", "H", "L", "C"], inline="p3")
-p3_style = input.string("Dashed", "", group="Plot 3", options=["Solid", "Dashed", "Dotted"], inline="p3_style")
-p3_color = input.color(color.blue, "", group="Plot 3", inline="p3_style")
-p3_width = input.int(1, "", group="Plot 3", inline="p3_style", minval=1, maxval=4)
-p3_label = input.string("Weekly high", "Label", group="Plot 3", inline="p3_label")
-p3_extend = input.bool(false, "Extend Line", group="Plot 3", inline="p3_style")
-
+var bool p3_enable = true
+var string p3_candle = "Previous"
+var string p3_tf = "D"
+var string p3_ohlc = "H"
+var string p3_style = "Solid"
+var color p3_color = color.blue
+var int p3_width = 1
+var string p3_label = "Prev. Day high"
+var bool p3_extend = false
 // Plot 4
-p4_enable = input.bool(true, "", group="Plot 4", inline="p4", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p4_candle = input.string("Current", "", group="Plot 4", options=["Current", "Previous"], inline="p4")
-p4_tf = input.timeframe("W", "", group="Plot 4", inline="p4")
-p4_ohlc = input.string("L", "", group="Plot 4", options=["O", "H", "L", "C"], inline="p4")
-p4_style = input.string("Dashed", "", group="Plot 4", options=["Solid", "Dashed", "Dotted"], inline="p4_style")
-p4_color = input.color(color.red, "", group="Plot 4", inline="p4_style")
-p4_width = input.int(1, "", group="Plot 4", inline="p4_style", minval=1, maxval=4)
-p4_label = input.string("Weekly low", "Label", group="Plot 4", inline="p4_label")
-p4_extend = input.bool(false, "Extend Line", group="Plot 4", inline="p4_style")
-
+var bool p4_enable = true
+var string p4_candle = "Previous"
+var string p4_tf = "D"
+var string p4_ohlc = "L"
+var string p4_style = "Solid"
+var color p4_color = color.red
+var int p4_width = 1
+var string p4_label = "Prev. Day low"
+var bool p4_extend = false
 // Plot 5
-p5_enable = input.bool(true, "", group="Plot 5", inline="p5", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p5_candle = input.string("Current", "", group="Plot 5", options=["Current", "Previous"], inline="p5")
-p5_tf = input.timeframe("W", "", group="Plot 5", inline="p5")
-p5_ohlc = input.string("O", "", group="Plot 5", options=["O", "H", "L", "C"], inline="p5")
-p5_style = input.string("Dotted", "", group="Plot 5", options=["Solid", "Dashed", "Dotted"], inline="p5_style")
-p5_color = input.color(color.green, "", group="Plot 5", inline="p5_style")
-p5_width = input.int(2, "", group="Plot 5", inline="p5_style", minval=1, maxval=4)
-p5_label = input.string("Weekly open", "Label", group="Plot 5", inline="p5_label")
-p5_extend = input.bool(false, "Extend Line", group="Plot 5", inline="p5_style")
-
+var bool p5_enable = true
+var string p5_candle = "Current"
+var string p5_tf = "D"
+var string p5_ohlc = "O"
+var string p5_style = "Dotted"
+var color p5_color = color.green
+var int p5_width = 1
+var string p5_label = "Current Day Open"
+var bool p5_extend = false
 // Plot 6
-p6_enable = input.bool(true, "", group="Plot 6", inline="p6", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p6_candle = input.string("Previous", "", group="Plot 6", options=["Current", "Previous"], inline="p6")
-p6_tf = input.timeframe("D", "", group="Plot 6", inline="p6")
-p6_ohlc = input.string("H", "", group="Plot 6", options=["O", "H", "L", "C"], inline="p6")
-p6_style = input.string("Solid", "", group="Plot 6", options=["Solid", "Dashed", "Dotted"], inline="p6_style")
-p6_color = input.color(#728acc, "", group="Plot 6", inline="p6_style")
-p6_width = input.int(2, "", group="Plot 6", inline="p6_style", minval=1, maxval=4)
-p6_label = input.string("Prev. Day high", "Label", group="Plot 6", inline="p6_label")
-p6_extend = input.bool(false, "Extend Line", group="Plot 6", inline="p6_style")
-
+var bool p6_enable = true
+var string p6_candle = "Current"
+var string p6_tf = "D"
+var string p6_ohlc = "C"
+var string p6_style = "Dotted"
+var color p6_color = color.green
+var int p6_width = 1
+var string p6_label = "Current Day Close"
+var bool p6_extend = false
 // Plot 7
-p7_enable = input.bool(true, "", group="Plot 7", inline="p7", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p7_candle = input.string("Previous", "", group="Plot 7", options=["Current", "Previous"], inline="p7")
-p7_tf = input.timeframe("D", "", group="Plot 7", inline="p7")
-p7_ohlc = input.string("L", "", group="Plot 7", options=["O", "H", "L", "C"], inline="p7")
-p7_style = input.string("Solid", "", group="Plot 7", options=["Solid", "Dashed", "Dotted"], inline="p7_style")
-p7_color = input.color(#c25f67, "", group="Plot 7", inline="p7_style")
-p7_width = input.int(2, "", group="Plot 7", inline="p7_style", minval=1, maxval=4)
-p7_label = input.string("Prev. Day low", "Label", group="Plot 7", inline="p7_label")
-p7_extend = input.bool(false, "Extend Line", group="Plot 7", inline="p7_style")
-
+var bool p7_enable = true
+var string p7_candle = "Current"
+var string p7_tf = "D"
+var string p7_ohlc = "H"
+var string p7_style = "Dotted"
+var color p7_color = color.blue
+var int p7_width = 1
+var string p7_label = "Current Day High"
+var bool p7_extend = false
 // Plot 8
-p8_enable = input.bool(true, "", group="Plot 8", inline="p8", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p8_candle = input.string("Current", "", group="Plot 8", options=["Current", "Previous"], inline="p8")
-p8_tf = input.timeframe("D", "", group="Plot 8", inline="p8")
-p8_ohlc = input.string("H", "", group="Plot 8", options=["O", "H", "L", "C"], inline="p8")
-p8_style = input.string("Dashed", "", group="Plot 8", options=["Solid", "Dashed", "Dotted"], inline="p8_style")
-p8_color = input.color(#728acc, "", group="Plot 8", inline="p8_style")
-p8_width = input.int(1, "", group="Plot 8", inline="p8_style", minval=1, maxval=4)
-p8_label = input.string("Daily high", "Label", group="Plot 8", inline="p8_label")
-p8_extend = input.bool(false, "Extend Line", group="Plot 8", inline="p8_style")
-
+var bool p8_enable = true
+var string p8_candle = "Current"
+var string p8_tf = "D"
+var string p8_ohlc = "L"
+var string p8_style = "Dotted"
+var color p8_color = color.red
+var int p8_width = 1
+var string p8_label = "Current Day Low"
+var bool p8_extend = false
 // Plot 9
-p9_enable = input.bool(true, "", group="Plot 9", inline="p9", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p9_candle = input.string("Current", "", group="Plot 9", options=["Current", "Previous"], inline="p9")
-p9_tf = input.timeframe("D", "", group="Plot 9", inline="p9")
-p9_ohlc = input.string("L", "", group="Plot 9", options=["O", "H", "L", "C"], inline="p9")
-p9_style = input.string("Dashed", "", group="Plot 9", options=["Solid", "Dashed", "Dotted"], inline="p9_style")
-p9_color = input.color(#c25f67, "", group="Plot 9", inline="p9_style")
-p9_width = input.int(1, "", group="Plot 9", inline="p9_style", minval=1, maxval=4)
-p9_label = input.string("Daily low", "Label", group="Plot 9", inline="p9_label")
-p9_extend = input.bool(false, "Extend Line", group="Plot 9", inline="p9_style")
-
+var bool p9_enable = false
+var string p9_candle = "Previous"
+var string p9_tf = "D"
+var string p9_ohlc = "O"
+var string p9_style = "Solid"
+var color p9_color = color.green
+var int p9_width = 1
+var string p9_label = "Custom 1"
+var bool p9_extend = false
 // Plot 10
-p10_enable = input.bool(false, "", group="Plot 10", inline="p10", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
-p10_candle = input.string("Current", "", group="Plot 10", options=["Current", "Previous"], inline="p10")
-p10_tf = input.timeframe("60", "", group="Plot 10", inline="p10")
-p10_ohlc = input.string("O", "", group="Plot 10", options=["O", "H", "L", "C"], inline="p10")
-p10_style = input.string("Dotted", "", group="Plot 10", options=["Solid", "Dashed", "Dotted"], inline="p10_style")
-p10_color = input.color(color.gray, "", group="Plot 10", inline="p10_style")
-p10_width = input.int(1, "", group="Plot 10", inline="p10_style", minval=1, maxval=4)
-p10_label = input.string("", "Label", group="Plot 10", inline="p10_label")
-p10_extend = input.bool(false, "Extend Line", group="Plot 10", inline="p10_style")
+var bool p10_enable = false
+var string p10_candle = "Previous"
+var string p10_tf = "D"
+var string p10_ohlc = "O"
+var string p10_style = "Solid"
+var color p10_color = color.green
+var int p10_width = 1
+var string p10_label = "Custom 2"
+var bool p10_extend = false
+
+// Input mezők
+input_p1_enable = input.bool(true, "", group="Plot 1", inline="p1", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p1_candle = input.string("Previous", "", group="Plot 1", options=["Current", "Previous"], inline="p1")
+input_p1_tf = input.timeframe("W", "", group="Plot 1", inline="p1")
+input_p1_ohlc = input.string("H", "", group="Plot 1", options=["O", "H", "L", "C"], inline="p1")
+input_p1_style = input.string("Solid", "", group="Plot 1", options=["Solid", "Dashed", "Dotted"], inline="p1_style")
+input_p1_color = input.color(color.blue, "", group="Plot 1", inline="p1_style")
+input_p1_width = input.int(2, "", group="Plot 1", inline="p1_style", minval=1, maxval=4)
+input_p1_label = input.string("Prev. Week high", "Label", group="Plot 1", inline="p1_label")
+input_p1_extend = input.bool(false, "Extend Line", group="Plot 1", inline="p1_style")
+
+input_p2_enable = input.bool(true, "", group="Plot 2", inline="p2", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p2_candle = input.string("Previous", "", group="Plot 2", options=["Current", "Previous"], inline="p2")
+input_p2_tf = input.timeframe("W", "", group="Plot 2", inline="p2")
+input_p2_ohlc = input.string("L", "", group="Plot 2", options=["O", "H", "L", "C"], inline="p2")
+input_p2_style = input.string("Solid", "", group="Plot 2", options=["Solid", "Dashed", "Dotted"], inline="p2_style")
+input_p2_color = input.color(color.red, "", group="Plot 2", inline="p2_style")
+input_p2_width = input.int(2, "", group="Plot 2", inline="p2_style", minval=1, maxval=4)
+input_p2_label = input.string("Prev. Week low", "Label", group="Plot 2", inline="p2_label")
+input_p2_extend = input.bool(false, "Extend Line", group="Plot 2", inline="p2_style")
+
+input_p3_enable = input.bool(true, "", group="Plot 3", inline="p3", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p3_candle = input.string("Previous", "", group="Plot 3", options=["Current", "Previous"], inline="p3")
+input_p3_tf = input.timeframe("D", "", group="Plot 3", inline="p3")
+input_p3_ohlc = input.string("H", "", group="Plot 3", options=["O", "H", "L", "C"], inline="p3")
+input_p3_style = input.string("Solid", "", group="Plot 3", options=["Solid", "Dashed", "Dotted"], inline="p3_style")
+input_p3_color = input.color(color.blue, "", group="Plot 3", inline="p3_style")
+input_p3_width = input.int(1, "", group="Plot 3", inline="p3_style", minval=1, maxval=4)
+input_p3_label = input.string("Prev. Day high", "Label", group="Plot 3", inline="p3_label")
+input_p3_extend = input.bool(false, "Extend Line", group="Plot 3", inline="p3_style")
+
+input_p4_enable = input.bool(true, "", group="Plot 4", inline="p4", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p4_candle = input.string("Previous", "", group="Plot 4", options=["Current", "Previous"], inline="p4")
+input_p4_tf = input.timeframe("D", "", group="Plot 4", inline="p4")
+input_p4_ohlc = input.string("L", "", group="Plot 4", options=["O", "H", "L", "C"], inline="p4")
+input_p4_style = input.string("Solid", "", group="Plot 4", options=["Solid", "Dashed", "Dotted"], inline="p4_style")
+input_p4_color = input.color(color.red, "", group="Plot 4", inline="p4_style")
+input_p4_width = input.int(1, "", group="Plot 4", inline="p4_style", minval=1, maxval=4)
+input_p4_label = input.string("Prev. Day low", "Label", group="Plot 4", inline="p4_label")
+input_p4_extend = input.bool(false, "Extend Line", group="Plot 4", inline="p4_style")
+
+input_p5_enable = input.bool(true, "", group="Plot 5", inline="p5", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p5_candle = input.string("Current", "", group="Plot 5", options=["Current", "Previous"], inline="p5")
+input_p5_tf = input.timeframe("D", "", group="Plot 5", inline="p5")
+input_p5_ohlc = input.string("O", "", group="Plot 5", options=["O", "H", "L", "C"], inline="p5")
+input_p5_style = input.string("Dotted", "", group="Plot 5", options=["Solid", "Dashed", "Dotted"], inline="p5_style")
+input_p5_color = input.color(color.green, "", group="Plot 5", inline="p5_style")
+input_p5_width = input.int(1, "", group="Plot 5", inline="p5_style", minval=1, maxval=4)
+input_p5_label = input.string("Current Day Open", "Label", group="Plot 5", inline="p5_label")
+input_p5_extend = input.bool(false, "Extend Line", group="Plot 5", inline="p5_style")
+
+input_p6_enable = input.bool(true, "", group="Plot 6", inline="p6", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p6_candle = input.string("Current", "", group="Plot 6", options=["Current", "Previous"], inline="p6")
+input_p6_tf = input.timeframe("D", "", group="Plot 6", inline="p6")
+input_p6_ohlc = input.string("C", "", group="Plot 6", options=["O", "H", "L", "C"], inline="p6")
+input_p6_style = input.string("Dotted", "", group="Plot 6", options=["Solid", "Dashed", "Dotted"], inline="p6_style")
+input_p6_color = input.color(color.green, "", group="Plot 6", inline="p6_style")
+input_p6_width = input.int(1, "", group="Plot 6", inline="p6_style", minval=1, maxval=4)
+input_p6_label = input.string("Current Day Close", "Label", group="Plot 6", inline="p6_label")
+input_p6_extend = input.bool(false, "Extend Line", group="Plot 6", inline="p6_style")
+
+input_p7_enable = input.bool(true, "", group="Plot 7", inline="p7", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p7_candle = input.string("Current", "", group="Plot 7", options=["Current", "Previous"], inline="p7")
+input_p7_tf = input.timeframe("D", "", group="Plot 7", inline="p7")
+input_p7_ohlc = input.string("H", "", group="Plot 7", options=["O", "H", "L", "C"], inline="p7")
+input_p7_style = input.string("Dotted", "", group="Plot 7", options=["Solid", "Dashed", "Dotted"], inline="p7_style")
+input_p7_color = input.color(color.blue, "", group="Plot 7", inline="p7_style")
+input_p7_width = input.int(1, "", group="Plot 7", inline="p7_style", minval=1, maxval=4)
+input_p7_label = input.string("Current Day High", "Label", group="Plot 7", inline="p7_label")
+input_p7_extend = input.bool(false, "Extend Line", group="Plot 7", inline="p7_style")
+
+input_p8_enable = input.bool(true, "", group="Plot 8", inline="p8", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p8_candle = input.string("Current", "", group="Plot 8", options=["Current", "Previous"], inline="p8")
+input_p8_tf = input.timeframe("D", "", group="Plot 8", inline="p8")
+input_p8_ohlc = input.string("L", "", group="Plot 8", options=["O", "H", "L", "C"], inline="p8")
+input_p8_style = input.string("Dotted", "", group="Plot 8", options=["Solid", "Dashed", "Dotted"], inline="p8_style")
+input_p8_color = input.color(color.red, "", group="Plot 8", inline="p8_style")
+input_p8_width = input.int(1, "", group="Plot 8", inline="p8_style", minval=1, maxval=4)
+input_p8_label = input.string("Current Day Low", "Label", group="Plot 8", inline="p8_label")
+input_p8_extend = input.bool(false, "Extend Line", group="Plot 8", inline="p8_style")
+
+input_p9_enable = input.bool(false, "", group="Plot 9", inline="p9", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p9_candle = input.string("Previous", "", group="Plot 9", options=["Current", "Previous"], inline="p9")
+input_p9_tf = input.timeframe("D", "", group="Plot 9", inline="p9")
+input_p9_ohlc = input.string("O", "", group="Plot 9", options=["O", "H", "L", "C"], inline="p9")
+input_p9_style = input.string("Solid", "", group="Plot 9", options=["Solid", "Dashed", "Dotted"], inline="p9_style")
+input_p9_color = input.color(color.green, "", group="Plot 9", inline="p9_style")
+input_p9_width = input.int(1, "", group="Plot 9", inline="p9_style", minval=1, maxval=4)
+input_p9_label = input.string("Custom 1", "Label", group="Plot 9", inline="p9_label")
+input_p9_extend = input.bool(false, "Extend Line", group="Plot 9", inline="p9_style")
+
+input_p10_enable = input.bool(false, "", group="Plot 10", inline="p10", tooltip="Choose the current or the previous candles OHLC on specific timeframe.")
+input_p10_candle = input.string("Previous", "", group="Plot 10", options=["Current", "Previous"], inline="p10")
+input_p10_tf = input.timeframe("D", "", group="Plot 10", inline="p10")
+input_p10_ohlc = input.string("O", "", group="Plot 10", options=["O", "H", "L", "C"], inline="p10")
+input_p10_style = input.string("Solid", "", group="Plot 10", options=["Solid", "Dashed", "Dotted"], inline="p10_style")
+input_p10_color = input.color(color.green, "", group="Plot 10", inline="p10_style")
+input_p10_width = input.int(1, "", group="Plot 10", inline="p10_style", minval=1, maxval=4)
+input_p10_label = input.string("Custom 2", "Label", group="Plot 10", inline="p10_label")
+input_p10_extend = input.bool(false, "Extend Line", group="Plot 10", inline="p10_style")
+
+// =================== Preset Settings Storage ===================
+// Színek definiálása
+var color PRESET_BLUE = #728acc
+var color PRESET_RED = #c25f67
+var color PRESET_GREEN = #86c1a7
+var color PRESET_DAILY_FIB = #e17261
+
+// Custom beállítások mentése/betöltése
+var bool is_first_run = true
+var string previous_preset = "Custom"
+
+// Custom beállítások tárolása
+// Plot 1 custom tárolás
+var bool custom_p1_enable = false
+var string custom_p1_candle = ""
+var string custom_p1_tf = ""
+var string custom_p1_ohlc = ""
+var string custom_p1_style = ""
+var color custom_p1_color = color.blue
+var int custom_p1_width = 1
+var string custom_p1_label = ""
+var bool custom_p1_extend = false
+// Plot 2 custom tárolás
+var bool custom_p2_enable = false
+var string custom_p2_candle = ""
+var string custom_p2_tf = ""
+var string custom_p2_ohlc = ""
+var string custom_p2_style = ""
+var color custom_p2_color = color.red
+var int custom_p2_width = 1
+var string custom_p2_label = ""
+var bool custom_p2_extend = false
+// Plot 3 custom tárolás
+var bool custom_p3_enable = false
+var string custom_p3_candle = ""
+var string custom_p3_tf = ""
+var string custom_p3_ohlc = ""
+var string custom_p3_style = ""
+var color custom_p3_color = color.blue
+var int custom_p3_width = 1
+var string custom_p3_label = ""
+var bool custom_p3_extend = false
+// Plot 4 custom tárolás
+var bool custom_p4_enable = false
+var string custom_p4_candle = ""
+var string custom_p4_tf = ""
+var string custom_p4_ohlc = ""
+var string custom_p4_style = ""
+var color custom_p4_color = color.red
+var int custom_p4_width = 1
+var string custom_p4_label = ""
+var bool custom_p4_extend = false
+// Plot 5 custom tárolás
+var bool custom_p5_enable = false
+var string custom_p5_candle = ""
+var string custom_p5_tf = ""
+var string custom_p5_ohlc = ""
+var string custom_p5_style = ""
+var color custom_p5_color = color.green
+var int custom_p5_width = 1
+var string custom_p5_label = ""
+var bool custom_p5_extend = false
+// Plot 6 custom tárolás
+var bool custom_p6_enable = false
+var string custom_p6_candle = ""
+var string custom_p6_tf = ""
+var string custom_p6_ohlc = ""
+var string custom_p6_style = ""
+var color custom_p6_color = color.green
+var int custom_p6_width = 1
+var string custom_p6_label = ""
+var bool custom_p6_extend = false
+// Plot 7 custom tárolás
+var bool custom_p7_enable = false
+var string custom_p7_candle = ""
+var string custom_p7_tf = ""
+var string custom_p7_ohlc = ""
+var string custom_p7_style = ""
+var color custom_p7_color = color.blue
+var int custom_p7_width = 1
+var string custom_p7_label = ""
+var bool custom_p7_extend = false
+// Plot 8 custom tárolás
+var bool custom_p8_enable = false
+var string custom_p8_candle = ""
+var string custom_p8_tf = ""
+var string custom_p8_ohlc = ""
+var string custom_p8_style = ""
+var color custom_p8_color = color.red
+var int custom_p8_width = 1
+var string custom_p8_label = ""
+var bool custom_p8_extend = false
+// Plot 9 custom tárolás
+var bool custom_p9_enable = false
+var string custom_p9_candle = ""
+var string custom_p9_tf = ""
+var string custom_p9_ohlc = ""
+var string custom_p9_style = ""
+var color custom_p9_color = color.green
+var int custom_p9_width = 1
+var string custom_p9_label = ""
+var bool custom_p9_extend = false
+// Plot 10 custom tárolás
+var bool custom_p10_enable = false
+var string custom_p10_candle = ""
+var string custom_p10_tf = ""
+var string custom_p10_ohlc = ""
+var string custom_p10_style = ""
+var color custom_p10_color = color.green
+var int custom_p10_width = 1
+var string custom_p10_label = ""
+var bool custom_p10_extend = false
+
+
+// Preset váltás detektálása
+bool is_preset_changed = selected_preset != previous_preset
+
+// Watermark megjelenítése
+if barstate.islast
+    var label watermark = na
+    if na(watermark)
+        watermark := label.new(bar_index, high, 
+             text="Custom Framework Builder\nPreset: " + selected_preset,
+             style=label.style_label_center,
+             color=color.new(color.black, 100),
+             textcolor=color.black,
+             size=size.large,
+             yloc=yloc.price)
+    else
+        label.set_xy(watermark, bar_index, high)
+        label.set_text(watermark, "Custom Framework Builder\nPreset: " + selected_preset)
+
+// Preset váltás kezelése
+if is_preset_changed and previous_preset == "Custom" and not is_first_run
+    // Custom beállítások mentése változókba
+    custom_p1_enable := p1_enable
+    custom_p1_candle := p1_candle
+    custom_p1_tf := p1_tf
+    custom_p1_ohlc := p1_ohlc
+    custom_p1_style := p1_style
+    custom_p1_color := p1_color
+    custom_p1_width := p1_width
+    custom_p1_label := p1_label
+    custom_p1_extend := p1_extend
+    custom_p2_enable := p2_enable
+    custom_p2_candle := p2_candle
+    custom_p2_tf := p2_tf
+    custom_p2_ohlc := p2_ohlc
+    custom_p2_style := p2_style
+    custom_p2_color := p2_color
+    custom_p2_width := p2_width
+    custom_p2_label := p2_label
+    custom_p2_extend := p2_extend
+    custom_p3_enable := p3_enable
+    custom_p3_candle := p3_candle
+    custom_p3_tf := p3_tf
+    custom_p3_ohlc := p3_ohlc
+    custom_p3_style := p3_style
+    custom_p3_color := p3_color
+    custom_p3_width := p3_width
+    custom_p3_label := p3_label
+    custom_p3_extend := p3_extend
+    custom_p4_enable := p4_enable
+    custom_p4_candle := p4_candle
+    custom_p4_tf := p4_tf
+    custom_p4_ohlc := p4_ohlc
+    custom_p4_style := p4_style
+    custom_p4_color := p4_color
+    custom_p4_width := p4_width
+    custom_p4_label := p4_label
+    custom_p4_extend := p4_extend
+    custom_p5_enable := p5_enable
+    custom_p5_candle := p5_candle
+    custom_p5_tf := p5_tf
+    custom_p5_ohlc := p5_ohlc
+    custom_p5_style := p5_style
+    custom_p5_color := p5_color
+    custom_p5_width := p5_width
+    custom_p5_label := p5_label
+    custom_p5_extend := p5_extend
+    custom_p6_enable := p6_enable
+    custom_p6_candle := p6_candle
+    custom_p6_tf := p6_tf
+    custom_p6_ohlc := p6_ohlc
+    custom_p6_style := p6_style
+    custom_p6_color := p6_color
+    custom_p6_width := p6_width
+    custom_p6_label := p6_label
+    custom_p6_extend := p6_extend
+    custom_p7_enable := p7_enable
+    custom_p7_candle := p7_candle
+    custom_p7_tf := p7_tf
+    custom_p7_ohlc := p7_ohlc
+    custom_p7_style := p7_style
+    custom_p7_color := p7_color
+    custom_p7_width := p7_width
+    custom_p7_label := p7_label
+    custom_p7_extend := p7_extend
+    custom_p8_enable := p8_enable
+    custom_p8_candle := p8_candle
+    custom_p8_tf := p8_tf
+    custom_p8_ohlc := p8_ohlc
+    custom_p8_style := p8_style
+    custom_p8_color := p8_color
+    custom_p8_width := p8_width
+    custom_p8_label := p8_label
+    custom_p8_extend := p8_extend
+    custom_p9_enable := p9_enable
+    custom_p9_candle := p9_candle
+    custom_p9_tf := p9_tf
+    custom_p9_ohlc := p9_ohlc
+    custom_p9_style := p9_style
+    custom_p9_color := p9_color
+    custom_p9_width := p9_width
+    custom_p9_label := p9_label
+    custom_p9_extend := p9_extend
+    custom_p10_enable := p10_enable
+    custom_p10_candle := p10_candle
+    custom_p10_tf := p10_tf
+    custom_p10_ohlc := p10_ohlc
+    custom_p10_style := p10_style
+    custom_p10_color := p10_color
+    custom_p10_width := p10_width
+    custom_p10_label := p10_label
+    custom_p10_extend := p10_extend
+
+// Preset beállítások alkalmazása
+if is_preset_changed
+    if selected_preset == "Weekly Orderflow"
+        // Weekly Orderflow preset beállításai
+        p1_enable := true
+        p1_candle := "Previous"
+        p1_tf := "W"
+        p1_ohlc := "H"
+        p1_style := "Solid"
+        p1_color := PRESET_BLUE
+        p1_width := 2
+        p1_label := "Prev. Week High"
+        p1_extend := false
+        is_first_run := false
+        p2_enable := true
+        p2_candle := "Previous"
+        p2_tf := "W"
+        p2_ohlc := "L"
+        p2_style := "Solid"
+        p2_color := PRESET_RED
+        p2_width := 2
+        p2_label := "Prev. Week Low"
+        p2_extend := false
+        p3_enable := true
+        p3_candle := "Previous"
+        p3_tf := "D"
+        p3_ohlc := "H"
+        p3_style := "Dashed"
+        p3_color := PRESET_BLUE
+        p3_width := 1
+        p3_label := "Prev. Day High"
+        p3_extend := false
+        p4_enable := true
+        p4_candle := "Previous"
+        p4_tf := "D"
+        p4_ohlc := "L"
+        p4_style := "Dashed"
+        p4_color := PRESET_RED
+        p4_width := 1
+        p4_label := "Prev. Day Low"
+        p4_extend := false
+        p5_enable := true
+        p5_candle := "Current"
+        p5_tf := "D"
+        p5_ohlc := "O"
+        p5_style := "Dotted"
+        p5_color := PRESET_GREEN
+        p5_width := 1
+        p5_label := "Current Day Open"
+        p5_extend := false
+        p6_enable := true
+        p6_candle := "Current"
+        p6_tf := "D"
+        p6_ohlc := "C"
+        p6_style := "Dotted"
+        p6_color := PRESET_GREEN
+        p6_width := 1
+        p6_label := "Current Day Close"
+        p6_extend := false
+        p7_enable := true
+        p7_candle := "Current"
+        p7_tf := "D"
+        p7_ohlc := "H"
+        p7_style := "Dotted"
+        p7_color := PRESET_BLUE
+        p7_width := 1
+        p7_label := "Current Day High"
+        p7_extend := false
+        p8_enable := true
+        p8_candle := "Current"
+        p8_tf := "D"
+        p8_ohlc := "L"
+        p8_style := "Dotted"
+        p8_color := PRESET_RED
+        p8_width := 1
+        p8_label := "Current Day Low"
+        p8_extend := false
+        p9_enable := false
+        p9_candle := "Previous"
+        p9_tf := "D"
+        p9_ohlc := "O"
+        p9_style := "Solid"
+        p9_color := PRESET_GREEN
+        p9_width := 1
+        p9_label := "Custom 1"
+        p9_extend := false
+        p10_enable := false
+        p10_candle := "Previous"
+        p10_tf := "D"
+        p10_ohlc := "O"
+        p10_style := "Solid"
+        p10_color := PRESET_GREEN
+        p10_width := 1
+        p10_label := "Custom 2"
+        p10_extend := false
+    else if selected_preset == "Daily Orderflow"
+        // Daily Orderflow preset beállításai
+        p1_enable := true
+        p1_candle := "Previous"
+        p1_tf := "D"
+        p1_ohlc := "H"
+        p1_style := "Solid"
+        p1_color := PRESET_BLUE
+        p1_width := 1
+        p1_label := "Prev. Day High"
+        p1_extend := false
+        is_first_run := false
+        p2_enable := true
+        p2_candle := "Previous"
+        p2_tf := "D"
+        p2_ohlc := "L"
+        p2_style := "Solid"
+        p2_color := PRESET_RED
+        p2_width := 1
+        p2_label := "Prev. Day Low"
+        p2_extend := false
+        p3_enable := true
+        p3_candle := "Previous"
+        p3_tf := "60"  // Módosítva 240-ről 60-ra (1 órás)
+        p3_ohlc := "H"
+        p3_style := "Dashed"
+        p3_color := PRESET_BLUE
+        p3_width := 1
+        p3_label := "Prev. 1H High"  // Címke frissítve
+        p3_extend := false
+        p4_enable := true
+        p4_candle := "Previous"
+        p4_tf := "60"
+        p4_ohlc := "L"
+        p4_style := "Dashed"
+        p4_color := PRESET_RED
+        p4_width := 1
+        p4_label := "Prev. 1H Low"
+        p4_extend := false
+        p5_enable := true
+        p5_candle := "Current"
+        p5_tf := "D"
+        p5_ohlc := "O"
+        p5_style := "Dotted"
+        p5_color := PRESET_GREEN
+        p5_width := 1
+        p5_label := "Current Day Open"
+        p5_extend := false
+        p6_enable := true
+        p6_candle := "Current"
+        p6_tf := "D"
+        p6_ohlc := "C"
+        p6_style := "Dotted"
+        p6_color := PRESET_GREEN
+        p6_width := 1
+        p6_label := "Current Day Close"
+        p6_extend := false
+        p7_enable := true
+        p7_candle := "Current"
+        p7_tf := "D"
+        p7_ohlc := "H"
+        p7_style := "Dotted"
+        p7_color := PRESET_BLUE
+        p7_width := 1
+        p7_label := "Current Day High"
+        p7_extend := false
+        p8_enable := true
+        p8_candle := "Current"
+        p8_tf := "D"
+        p8_ohlc := "L"
+        p8_style := "Dotted"
+        p8_color := PRESET_RED
+        p8_width := 1
+        p8_label := "Current Day Low"
+        p8_extend := false
+        p9_enable := false
+        p9_candle := "Previous"
+        p9_tf := "D"
+        p9_ohlc := "O"
+        p9_style := "Solid"
+        p9_color := PRESET_GREEN
+        p9_width := 1
+        p9_label := "Custom 1"
+        p9_extend := false
+        p10_enable := false
+        p10_candle := "Previous"
+        p10_tf := "D"
+        p10_ohlc := "O"
+        p10_style := "Solid"
+        p10_color := PRESET_GREEN
+        p10_width := 1
+        p10_label := "Custom 2"
+        p10_extend := false
+    else if selected_preset == "Custom" and not is_first_run
+        // Custom beállítások visszaállítása
+        p1_enable := custom_p1_enable
+        p1_candle := custom_p1_candle
+        p1_tf := custom_p1_tf
+        p1_ohlc := custom_p1_ohlc
+        p1_style := custom_p1_style
+        p1_color := custom_p1_color
+        p1_width := custom_p1_width
+        p1_label := custom_p1_label
+        p1_extend := custom_p1_extend
+        p2_enable := custom_p2_enable
+        p2_candle := custom_p2_candle
+        p2_tf := custom_p2_tf
+        p2_ohlc := custom_p2_ohlc
+        p2_style := custom_p2_style
+        p2_color := custom_p2_color
+        p2_width := custom_p2_width
+        p2_label := custom_p2_label
+        p2_extend := custom_p2_extend
+        p3_enable := custom_p3_enable
+        p3_candle := custom_p3_candle
+        p3_tf := custom_p3_tf
+        p3_ohlc := custom_p3_ohlc
+        p3_style := custom_p3_style
+        p3_color := custom_p3_color
+        p3_width := custom_p3_width
+        p3_label := custom_p3_label
+        p3_extend := custom_p3_extend
+        p4_enable := custom_p4_enable
+        p4_candle := custom_p4_candle
+        p4_tf := custom_p4_tf
+        p4_ohlc := custom_p4_ohlc
+        p4_style := custom_p4_style
+        p4_color := custom_p4_color
+        p4_width := custom_p4_width
+        p4_label := custom_p4_label
+        p4_extend := custom_p4_extend
+        p5_enable := custom_p5_enable
+        p5_candle := custom_p5_candle
+        p5_tf := custom_p5_tf
+        p5_ohlc := custom_p5_ohlc
+        p5_style := custom_p5_style
+        p5_color := custom_p5_color
+        p5_width := custom_p5_width
+        p5_label := custom_p5_label
+        p5_extend := custom_p5_extend
+        p6_enable := custom_p6_enable
+        p6_candle := custom_p6_candle
+        p6_tf := custom_p6_tf
+        p6_ohlc := custom_p6_ohlc
+        p6_style := custom_p6_style
+        p6_color := custom_p6_color
+        p6_width := custom_p6_width
+        p6_label := custom_p6_label
+        p6_extend := custom_p6_extend
+        p7_enable := custom_p7_enable
+        p7_candle := custom_p7_candle
+        p7_tf := custom_p7_tf
+        p7_ohlc := custom_p7_ohlc
+        p7_style := custom_p7_style
+        p7_color := custom_p7_color
+        p7_width := custom_p7_width
+        p7_label := custom_p7_label
+        p7_extend := custom_p7_extend
+        p8_enable := custom_p8_enable
+        p8_candle := custom_p8_candle
+        p8_tf := custom_p8_tf
+        p8_ohlc := custom_p8_ohlc
+        p8_style := custom_p8_style
+        p8_color := custom_p8_color
+        p8_width := custom_p8_width
+        p8_label := custom_p8_label
+        p8_extend := custom_p8_extend
+        p9_enable := custom_p9_enable
+        p9_candle := custom_p9_candle
+        p9_tf := custom_p9_tf
+        p9_ohlc := custom_p9_ohlc
+        p9_style := custom_p9_style
+        p9_color := custom_p9_color
+        p9_width := custom_p9_width
+        p9_label := custom_p9_label
+        p9_extend := custom_p9_extend
+        p10_enable := custom_p10_enable
+        p10_candle := custom_p10_candle
+        p10_tf := custom_p10_tf
+        p10_ohlc := custom_p10_ohlc
+        p10_style := custom_p10_style
+        p10_color := custom_p10_color
+        p10_width := custom_p10_width
+        p10_label := custom_p10_label
+        p10_extend := custom_p10_extend
+
+    previous_preset := selected_preset
+
+// Az input értékek szinkronizálása a runtime változókkal
+p1_enable := input_p1_enable
+p1_candle := input_p1_candle
+p1_tf := input_p1_tf
+p1_ohlc := input_p1_ohlc
+p1_style := input_p1_style
+p1_color := input_p1_color
+p1_width := input_p1_width
+p1_label := input_p1_label
+p1_extend := input_p1_extend
+
+p2_enable := input_p2_enable
+p2_candle := input_p2_candle
+p2_tf := input_p2_tf
+p2_ohlc := input_p2_ohlc
+p2_style := input_p2_style
+p2_color := input_p2_color
+p2_width := input_p2_width
+p2_label := input_p2_label
+p2_extend := input_p2_extend
+
+p3_enable := input_p3_enable
+p3_candle := input_p3_candle
+p3_tf := input_p3_tf
+p3_ohlc := input_p3_ohlc
+p3_style := input_p3_style
+p3_color := input_p3_color
+p3_width := input_p3_width
+p3_label := input_p3_label
+p3_extend := input_p3_extend
+
+p4_enable := input_p4_enable
+p4_candle := input_p4_candle
+p4_tf := input_p4_tf
+p4_ohlc := input_p4_ohlc
+p4_style := input_p4_style
+p4_color := input_p4_color
+p4_width := input_p4_width
+p4_label := input_p4_label
+p4_extend := input_p4_extend
+
+p5_enable := input_p5_enable
+p5_candle := input_p5_candle
+p5_tf := input_p5_tf
+p5_ohlc := input_p5_ohlc
+p5_style := input_p5_style
+p5_color := input_p5_color
+p5_width := input_p5_width
+p5_label := input_p5_label
+p5_extend := input_p5_extend
+
+p6_enable := input_p6_enable
+p6_candle := input_p6_candle
+p6_tf := input_p6_tf
+p6_ohlc := input_p6_ohlc
+p6_style := input_p6_style
+p6_color := input_p6_color
+p6_width := input_p6_width
+p6_label := input_p6_label
+p6_extend := input_p6_extend
+
+p7_enable := input_p7_enable
+p7_candle := input_p7_candle
+p7_tf := input_p7_tf
+p7_ohlc := input_p7_ohlc
+p7_style := input_p7_style
+p7_color := input_p7_color
+p7_width := input_p7_width
+p7_label := input_p7_label
+p7_extend := input_p7_extend
+
+p8_enable := input_p8_enable
+p8_candle := input_p8_candle
+p8_tf := input_p8_tf
+p8_ohlc := input_p8_ohlc
+p8_style := input_p8_style
+p8_color := input_p8_color
+p8_width := input_p8_width
+p8_label := input_p8_label
+p8_extend := input_p8_extend
+
+p9_enable := input_p9_enable
+p9_candle := input_p9_candle
+p9_tf := input_p9_tf
+p9_ohlc := input_p9_ohlc
+p9_style := input_p9_style
+p9_color := input_p9_color
+p9_width := input_p9_width
+p9_label := input_p9_label
+p9_extend := input_p9_extend
+
+p10_enable := input_p10_enable
+p10_candle := input_p10_candle
+p10_tf := input_p10_tf
+p10_ohlc := input_p10_ohlc
+p10_style := input_p10_style
+p10_color := input_p10_color
+p10_width := input_p10_width
+p10_label := input_p10_label
+p10_extend := input_p10_extend
+
+// =================== RÉGI Input mezők ===================
 
 // Fibonacci 1 beállítások
 fib1_enable = input.bool(true, "Enable Fibonacci 1", group="Fibonacci 1", inline="fib1_main")
