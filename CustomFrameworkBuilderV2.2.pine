@@ -172,73 +172,25 @@ fib5_line_style = input.string("Dashed", "Style", group="Fibonacci 5", options=[
 fib5_extend = input.bool(false, "Extend Lines", group="Fibonacci 5", inline="fib5_style")
 
 // =================== Segéd függvények ===================
-
+// Gyeryta adatok lekérése
+// Debug információkat adunk a kódhoz
 f_get_candle_data(tf_input, is_current) =>
-    float ret_open = na
-    float ret_high = na
-    float ret_low = na
-    float ret_close = na
-
     if timeframe.in_seconds(tf_input) > timeframe.in_seconds(timeframe.period)
-        var float curr_open = na
-        var float curr_high = na
-        var float curr_low = na
-        var float curr_close = na
-        
-        var float prev_open = na
-        var float prev_high = na
-        var float prev_low = na
-        var float prev_close = na
-        
-        var int last_time = 0
-        current_tf_time = time(tf_input)
-        
-        // Új időszak kezdetének ellenőrzése
-        if current_tf_time != last_time
-            // Előző időszak értékeinek mentése
-            prev_open := curr_open
-            prev_high := curr_high
-            prev_low := curr_low
-            prev_close := curr_close
-            
-            // Új időszak inicializálása
-            curr_open := open
-            curr_high := high
-            curr_low := low
-            curr_close := close
-            
-            last_time := current_tf_time
-        else
-            // Aktuális időszak frissítése
-            curr_high := math.max(nz(curr_high, high), high)
-            curr_low := math.min(nz(curr_low, low), low)
-            curr_close := close
-        
         if is_current
-            ret_open := curr_open
-            ret_high := curr_high
-            ret_low := curr_low
-            ret_close := curr_close
+            [curr_o, curr_h, curr_l, curr_c] = request.security(syminfo.tickerid, tf_input, [open, high, low, close], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+            [curr_o, curr_h, curr_l, curr_c]
         else
-            ret_open := prev_open
-            ret_high := prev_high
-            ret_low := prev_low
-            ret_close := prev_close
+            [prev_o, prev_h, prev_l, prev_c] = request.security(syminfo.tickerid, tf_input, [open[1], high[1], low[1], close[1]], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+            [prev_o, prev_h, prev_l, prev_c]
     else
         if is_current
-            ret_open := open
-            ret_high := high
-            ret_low := low
-            ret_close := close
+            [open, high, low, close]
         else
-            ret_open := open[1]
-            ret_high := high[1]
-            ret_low := low[1]
-            ret_close := close[1]
-    
-    [ret_open, ret_high, ret_low, ret_close]
+            [open[1], high[1], low[1], close[1]]
 
-f_draw_fibonacci_levels(value1, value2, fib_color, fib_width, fib_style, plot1_start_time, plot2_end_time) =>
+// Fibonacci rajzolás függvénye
+
+f_draw_fibonacci_levels(value1, value2, fib_color, fib_width, fib_style, start_time, end_time, fib_extended) =>
     if na(value1) or na(value2)
         [na, na, na]
     else
@@ -260,6 +212,12 @@ f_draw_fibonacci_levels(value1, value2, fib_color, fib_width, fib_style, plot1_s
         // Label pozicionálási beállítások
         horizontal_offset = timeframe.in_seconds(timeframe.period) * 1000 * 1  // 1 gyertya
         
+        // Extended vonal végpont számítása
+        var int last_chart_time = int(time)
+        if barstate.islast
+            last_chart_time := int(time)
+        
+        actual_end_time = fib_extended ? int(last_chart_time + (timeframe.in_seconds(timeframe.period) * 1000 * 3)) : end_time
         
         // Vonalak frissítése/létrehozása
         for i = 0 to 6
@@ -268,31 +226,29 @@ f_draw_fibonacci_levels(value1, value2, fib_color, fib_width, fib_style, plot1_s
             
             line_exists = not na(array.get(fib_lines, i))
             if line_exists
-                line.set_xy1(array.get(fib_lines, i), plot1_start_time, level)
-                line.set_xy2(array.get(fib_lines, i), plot2_end_time, level)
+                line.set_xy1(array.get(fib_lines, i), start_time, level)
+                line.set_xy2(array.get(fib_lines, i), actual_end_time, level)
                 line.set_color(array.get(fib_lines, i), fib_color)
                 line.set_width(array.get(fib_lines, i), fib_width)
                 line.set_style(array.get(fib_lines, i), line_style)
                 
                 label.set_xy(array.get(fib_labels_arr, i), 
-                     plot2_end_time - horizontal_offset 
-                     ,level)  // Mindig a vonal alatt
+                     actual_end_time - horizontal_offset, level)
                 label.set_text(array.get(fib_labels_arr, i), label_text)
                 label.set_textcolor(array.get(fib_labels_arr, i), fib_color)
             else
-                fib_line = line.new(x1=plot1_start_time, y1=level, x2=plot2_end_time, y2=level, 
+                fib_line = line.new(x1=start_time, y1=level, x2=actual_end_time, y2=level, 
                      color=fib_color, width=fib_width, style=line_style, 
                      xloc=xloc.bar_time)
                 array.set(fib_lines, i, fib_line)
                 
-                fib_label = label.new(x=plot2_end_time - horizontal_offset 
-                     ,y=level,  // Mindig a vonal alatt
+                fib_label = label.new(x=actual_end_time - horizontal_offset, y=level,
                      text=label_text, 
                      xloc=xloc.bar_time, style=label.style_label_left, 
-                     textcolor=fib_color, size=size.tiny, color=color.new(fib_color, 90))
+                     textcolor=fib_color, size=size.tiny, color=color.new(fib_color, 100))
                 array.set(fib_labels_arr, i, fib_label)
         
-        [value1, plot1_start_time, plot2_end_time]
+        [value1, start_time, actual_end_time]
 
 // =================== Plot-ok kezelése ===================
 
@@ -324,6 +280,7 @@ plot10_settings = PlotSettings.new(p10_enable, p10_candle, p10_tf, p10_ohlc, p10
 var float[] plot_values = array.new_float(10, na)
 var int[] plot_start_times = array.new_int(10, na)
 var int[] plot_end_times = array.new_int(10, na)
+var int[] plot_original_end_times = array.new_int(10, na)  // Új tömb az eredeti végpontoknak
 
 f_handle_plot(plot_number, settings) =>
     if settings.enable
@@ -350,12 +307,15 @@ f_handle_plot(plot_number, settings) =>
         // Kezdő és végpontok meghatározása
         int line_start_time = int(na)
         int line_end_time = int(na)
+        int original_end_time = int(na)
         
         if is_current
             // Current esetén a jelenlegi időszak kezdetétől
             current_period_start = request.security(syminfo.tickerid, settings.timeframe, time)
             line_start_time := int(current_period_start)
-            line_end_time := extended_end_time
+            // Új logika: mindig 3 chart timeframe gyertyáig nyúlik
+            original_end_time := int(last_chart_time + (timeframe.in_seconds(timeframe.period) * 1000 * 3))
+            line_end_time := original_end_time  // Az extend már nem befolyásolja a Current vonalakat
         else
             // Previous esetén
             tf_seconds = timeframe.in_seconds(settings.timeframe)
@@ -364,7 +324,8 @@ f_handle_plot(plot_number, settings) =>
             prev_period_end = current_period_start
             
             line_start_time := int(prev_period_start)
-            line_end_time := settings.extend ? extended_end_time : int(prev_period_end)
+            original_end_time := int(prev_period_end)
+            line_end_time := settings.extend ? extended_end_time : original_end_time
         
         // Vonal stílus beállítása
         line_style = switch settings.style
@@ -415,10 +376,11 @@ f_handle_plot(plot_number, settings) =>
         array.set(plot_values, plot_number - 1, value)
         array.set(plot_start_times, plot_number - 1, line_start_time)
         array.set(plot_end_times, plot_number - 1, line_end_time)
+        array.set(plot_original_end_times, plot_number - 1, original_end_time)
         
-        [value, line_start_time, line_end_time]
+        [value, line_start_time, line_end_time, original_end_time]
     else
-        [float(na), int(na), int(na)]
+        [float(na), int(na), int(na), int(na)]
 
 get_plot_values(plot_name) =>
     plot_idx = switch plot_name
@@ -435,9 +397,12 @@ get_plot_values(plot_name) =>
         => -1
     
     if plot_idx >= 0
-        [array.get(plot_values, plot_idx), array.get(plot_start_times, plot_idx), array.get(plot_end_times, plot_idx)]
+        [array.get(plot_values, plot_idx), 
+         array.get(plot_start_times, plot_idx), 
+         array.get(plot_end_times, plot_idx),
+         array.get(plot_original_end_times, plot_idx)]
     else
-        [na, na, na]
+        [na, na, na, na]
 
 // Plot-ok számítása
 [value1, start_time1, end_time1] = f_handle_plot(1, plot1_settings)
@@ -455,36 +420,40 @@ get_plot_values(plot_name) =>
 if barstate.islast
     // Fibonacci 1
     if fib1_enable
-        [val1, start1, end1] = get_plot_values(fib1_plot1)
-        [val2, start2, end2] = get_plot_values(fib1_plot2)
+        [val1, start1, end1, orig_end1] = get_plot_values(fib1_plot1)
+        [val2, start2, end2, orig_end2] = get_plot_values(fib1_plot2)
         if not na(val1) and not na(val2)
-            // Az első plot kezdő idejétől a második plot záró idejéig
-            f_draw_fibonacci_levels(val1, val2, fib1_color, fib1_width, fib1_line_style, start1, end2)
+            end_time = orig_end2  // Mindig az eredeti végpontot használjuk
+            f_draw_fibonacci_levels(val1, val2, fib1_color, fib1_width, fib1_line_style, start1, end_time, fib1_extend)
 
     // Fibonacci 2
     if fib2_enable
-        [val1, start1, end1] = get_plot_values(fib2_plot1)
-        [val2, start2, end2] = get_plot_values(fib2_plot2)
+        [val1, start1, end1, orig_end1] = get_plot_values(fib2_plot1)
+        [val2, start2, end2, orig_end2] = get_plot_values(fib2_plot2)
         if not na(val1) and not na(val2)
-            f_draw_fibonacci_levels(val1, val2, fib2_color, fib2_width, fib2_line_style, start1, end2)
+            end_time = orig_end2
+            f_draw_fibonacci_levels(val1, val2, fib2_color, fib2_width, fib2_line_style, start1, end_time, fib2_extend)
     
     // Fibonacci 3
     if fib3_enable
-        [val1, start1, end1] = get_plot_values(fib3_plot1)
-        [val2, start2, end2] = get_plot_values(fib3_plot2)
+        [val1, start1, end1, orig_end1] = get_plot_values(fib3_plot1)
+        [val2, start2, end2, orig_end2] = get_plot_values(fib3_plot2)
         if not na(val1) and not na(val2)
-            f_draw_fibonacci_levels(val1, val2, fib3_color, fib3_width, fib3_line_style, start1, end2)
+            end_time = orig_end2
+            f_draw_fibonacci_levels(val1, val2, fib3_color, fib3_width, fib3_line_style, start1, end_time, fib3_extend)
     
     // Fibonacci 4
     if fib4_enable
-        [val1, start1, end1] = get_plot_values(fib4_plot1)
-        [val2, start2, end2] = get_plot_values(fib4_plot2)
+        [val1, start1, end1, orig_end1] = get_plot_values(fib4_plot1)
+        [val2, start2, end2, orig_end2] = get_plot_values(fib4_plot2)
         if not na(val1) and not na(val2)
-            f_draw_fibonacci_levels(val1, val2, fib4_color, fib4_width, fib4_line_style, start1, end2)
+            end_time = orig_end2
+            f_draw_fibonacci_levels(val1, val2, fib4_color, fib4_width, fib4_line_style, start1, end_time, fib4_extend)
     
     // Fibonacci 5
     if fib5_enable
-        [val1, start1, end1] = get_plot_values(fib5_plot1)
-        [val2, start2, end2] = get_plot_values(fib5_plot2)
+        [val1, start1, end1, orig_end1] = get_plot_values(fib5_plot1)
+        [val2, start2, end2, orig_end2] = get_plot_values(fib5_plot2)
         if not na(val1) and not na(val2)
-            f_draw_fibonacci_levels(val1, val2, fib5_color, fib5_width, fib5_line_style, start1, end2)
+            end_time = orig_end2
+            f_draw_fibonacci_levels(val1, val2, fib5_color, fib5_width, fib5_line_style, start1, end_time, fib5_extend)
