@@ -335,7 +335,7 @@ bool is_preset_changed = selected_preset != previous_preset
 
 // Watermark megjelenítése table.cell használatával
 if barstate.islast
-    var table watermark = table.new(position.top, 1, 1, bgcolor = color.new(color.black, 100))
+    var table watermark = table.new(position.top_center, 1, 1, bgcolor = color.new(color.black, 100))
     table.cell(watermark, 0, 0, 
          text="Custom OHLC Framework Builder\nPreset: " + selected_preset,
          bgcolor=color.new(color.black, 100),
